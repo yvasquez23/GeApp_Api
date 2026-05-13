@@ -1,0 +1,25 @@
+# Build
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Publicación
+publish/
+out/
+
+# Secretos — NUNCA subir al repo
+**/appsettings.json
+**/appsettings.*.json
+
+# Mantener el template de ejemplo (sin valores reales)
+!**/appsettings.example.json
+
+# Rider / VS Code
+.idea/
+.vscode/
+*.DotSettings.user
+
+# Logs
+*.log
