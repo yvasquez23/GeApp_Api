@@ -178,11 +178,21 @@ public class CotizacionController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 50)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] int  page       = 1,
+        [FromQuery] int  pageSize   = 50,
+        [FromQuery] int? clienteId  = null)
     {
         pageSize = Math.Clamp(pageSize, 1, 100);
-        var total = await _ctx.Cotizacion.CountAsync();
-        var items = await _ctx.Cotizacion.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+        var query = _ctx.Cotizacion.AsQueryable();
+        if (clienteId.HasValue)
+            query = query.Where(c => c.Cliente_id == clienteId.Value);
+        var total = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(c => c.Cotizacion_Fecha)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
         Response.Headers["X-Total-Count"] = total.ToString();
         return Ok(items);
     }
