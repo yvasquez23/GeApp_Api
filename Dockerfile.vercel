@@ -1,0 +1,25 @@
+# Dockerfile.vercel — build de contenedor para Vercel Functions (Container Images)
+# Docs: https://vercel.com/docs/functions/container-images
+
+# ── Etapa 1: build/publish ───────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+COPY GEAPP_API/GEAPP_API.csproj GEAPP_API/
+RUN dotnet restore GEAPP_API/GEAPP_API.csproj
+
+COPY GEAPP_API/ GEAPP_API/
+RUN dotnet publish GEAPP_API/GEAPP_API.csproj -c Release -o /app/publish --no-restore
+
+# ── Etapa 2: runtime ─────────────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+
+ENV ASPNETCORE_ENVIRONMENT=Production
+# Vercel enruta al puerto indicado por PORT (por defecto 80 si no se define
+# en las variables de entorno del proyecto). Program.cs lee esta variable.
+ENV PORT=80
+EXPOSE 80
+
+ENTRYPOINT ["dotnet", "GEAPP_API.dll"]

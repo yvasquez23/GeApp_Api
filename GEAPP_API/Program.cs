@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -8,8 +9,19 @@ using GEAPP_API.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Escuchar en todas las interfaces de red (no solo localhost)
-builder.WebHost.UseUrls("http://0.0.0.0:9404", "https://localhost:9402");
+// ── Puerto ──────────────────────────────────────────────────────────────────
+// En contenedores (Vercel, Docker, etc.) el puerto llega por la variable PORT.
+// En local (dotnet run) mantenemos los valores fijos de siempre.
+var containerPort = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(containerPort))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{containerPort}");
+}
+else
+{
+    // Escuchar en todas las interfaces de red (no solo localhost)
+    builder.WebHost.UseUrls("http://0.0.0.0:9404", "https://localhost:9402");
+}
 
 // ── Base de datos GEAPP ────────────────────────────────────────────────────────
 builder.Services.AddDbContext<GEAPPContext>(options =>
@@ -118,6 +130,22 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+// ── Forwarded headers (necesario detrás de un proxy/edge como Vercel) ─────────
+// Vercel termina TLS en su borde y reenvía HTTP al contenedor. Sin esto,
+// ASP.NET Core cree que toda petición es HTTP y UseHttpsRedirection generaría
+// un bucle de redirecciones.
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+};
+// Vercel no publica rangos de IP fijos para su proxy interno, así que no
+// podemos restringir por KnownProxies/KnownNetworks como recomienda MS por
+// defecto. Se acepta el trade-off de seguridad (headers reenviados desde
+// cualquier origen se confían) a cambio de que funcione detrás de Vercel.
+forwardedHeadersOptions.KnownNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
 
 // ── Swagger solo en Development (OWASP API8) ───────────────────────────────────
 if (app.Environment.IsDevelopment())
